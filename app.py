@@ -45,7 +45,7 @@ class Question:
         self.correct_answer = correct_answer
         self.is_correct = is_correct
 
-class GMATTest:
+class MCQTest:
     def __init__(self, time_limit, result_file='result_file.csv', answer_key_file='answer_key_file.csv', start_idx=1, stop_idx=2):
         self.time_limit = time_limit
         self.questions = []
@@ -186,7 +186,7 @@ class GMATTest:
 
 if __name__ == '__main__':
     import argparse
-    parser = argparse.ArgumentParser(description='GMAT test-taking app')
+    parser = argparse.ArgumentParser(description='MCQ Based test-taking app')
     parser.add_argument('--start_idx'   , type=int , default=1          , help='Questions start index')
     parser.add_argument('--stop_idx'    , type=int , default=2          , help='Questions stop index')
     parser.add_argument('--dur'         , type=int , default=5          , help='Duration of test in minutes')
@@ -196,16 +196,16 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.mode == 'test':
-        test = GMATTest(args.dur, args.result_file, args.key, args.start_idx, args.stop_idx)
+        test = MCQTest(args.dur, args.result_file, args.key, args.start_idx, args.stop_idx)
         test.start()
     elif args.mode == 'key':
-        test = GMATTest(0, args.result_file, args.key, args.start_idx, args.stop_idx)
+        test = MCQTest(0, args.result_file, args.key, args.start_idx, args.stop_idx)
         test.enter_answer_key()
     elif args.mode == 'eval':
-        test = GMATTest(0, args.result_file, args.key, args.start_idx, args.stop_idx)
+        test = MCQTest(0, args.result_file, args.key, args.start_idx, args.stop_idx)
         test.evaluate()
         test.pretty_print_results()
     else:
-        test = GMATTest(0, args.result_file, args.key, args.start_idx, args.stop_idx)
+        test = MCQTest(0, args.result_file, args.key, args.start_idx, args.stop_idx)
         test.pretty_print_results()
 
