@@ -4,20 +4,37 @@ import csv
 import time
 import os
 import sys
+import readline
 
 timer_running = False
+pause_timer = False
 
 def get_time():
     return int(time.time())
 
-def print_timer(time_limit, main_timer, start_time):
+def calc_times(time_limit, main_timer, start_time):
+    curr_time = get_time()
+    question_time_spent = int((curr_time - start_time))
+    time_remaining_min = int((time_limit - (curr_time - main_timer))/60)
+    time_remaining_sec = int((time_limit - (curr_time - main_timer))%60)
+    return question_time_spent, time_remaining_min, time_remaining_sec
+
+def print_timer(time_limit, main_timer, start_time, idx):
     global timer_running
+    global pause_timer
     timer_running = True
+    sys.stdout.write(f"\n\n\n\n")
     while timer_running:
-        question_time_spent = int((get_time() - start_time))
-        time_remaining = int((time_limit*60 - (get_time() - main_timer))/60)
-        sys.stdout.write(f"\rTime spent for Question : {question_time_spent}s | Time remaining for Test: {time_remaining}m")
-        sys.stdout.flush()
+        question_time_spent, time_remaining_min, time_remaining_sec =  calc_times(time_limit, main_timer, start_time)
+        if not pause_timer:
+            sys.stdout.write(f"\033[s")
+            sys.stdout.write(f"\033[F\033[F")
+            sys.stdout.write(f"\033[F\033[F")
+            sys.stdout.write(f"Time spent for Question : {question_time_spent}s")
+            sys.stdout.write(f"\nTime remaining for Test: {time_remaining_min}:{time_remaining_sec}")
+            sys.stdout.write(f"\nQuestion {idx}:\n\n")
+            sys.stdout.write(f"\033[u")
+            sys.stdout.flush()
         time.sleep(1)
 
 class Question:
@@ -47,28 +64,29 @@ class GMATTest:
 
     def start(self):
         global timer_running
-        print(f"Starting test with {self.num_questions} questions.")
+        global pause_timer
+        print(f"Starting test with {self.num_questions} questions.\n\n\n")
         main_timer = get_time()
         for i in range(self.start_idx, self.stop_idx + 1):
             start_time = get_time()
-            timer_thread = Thread(target=print_timer, args=(self.time_limit, main_timer, start_time))
+            timer_thread = Thread(target=print_timer, args=(self.time_limit*60, main_timer, start_time, i))
             question = Question(i)
             timer_thread.start()
-            print()
-            print(f"Question {i}:")
             answer = input().lower()
+            # pause_timer = True
             while answer != 'quit' and answer not in ['a', 'b', 'c', 'd', 'e']:
-                answer = input("Invalid input. Please enter A, B, C, D, or E, or 'quit' to exit: ").lower()
+                answer = input("Invalid input. Please enter A, B, C, D, or E, or 'quit' to exit:\n\n\n\n\n").lower()
             if answer == 'quit':
                 print(f"Exiting test. Blank answers will be assumed for unanswered questions.")
+                timer_running = False
                 break
+            timer_running = False
             timer_thread.join()
             end_time = get_time()
             per_q_time = end_time - start_time
             question.selected_answer = answer
             question.time_taken = per_q_time
             self.questions.append(question)
-            timer_running = False
             
         main_timer = get_time() - main_timer
 
