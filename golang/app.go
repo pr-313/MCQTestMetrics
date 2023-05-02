@@ -5,19 +5,30 @@ import (
 	"fmt"
 	"os"
 	//"strconv"
+	"strings"
 	"time"
+
 	"github.com/jroimartin/gocui"
 )
 
 const (
-	numQuestions = 10 // Change this to the number of questions in your test
+	startIdx     = 1
+	stopIdx      = 10
+	numQuestions = (stopIdx - startIdx + 1)
 )
 
+type questionData struct {
+	questionNum  int
+	answer       string
+	response     string
+	responseTime float64
+}
+
 var (
-	answers     = make([]string, numQuestions)
-	responses   = make([]string, numQuestions)
-	startTime   time.Time
-	questionNum int
+	startTime    time.Time
+	lastAnsTime  time.Time
+	currIdx      int
+	questionBank = make([]questionData, (stopIdx - startIdx + 1))
 )
 
 func main() {
@@ -43,7 +54,8 @@ func main() {
 
 	// Start the test
 	startTime = time.Now()
-	questionNum = 1
+	lastAnsTime = startTime
+	currIdx = startIdx
 	g.MainLoop()
 }
 
@@ -53,19 +65,31 @@ func layout(g *gocui.Gui) error {
 		if err != gocui.ErrUnknownView {
 			return err
 		}
-		v.Title = fmt.Sprintf("Question %d", questionNum)
-		fmt.Fprintln(v, "This is question", questionNum)
+		v.Title = fmt.Sprintf("Question %d", startIdx)
+        v.Wrap = true
+        v.Autoscroll = true
+		fmt.Fprintln(v, "This is question", startIdx)
 	}
-	if v, err := g.SetView("response", 1, 6, maxX/2-1, maxY-1); err != nil {
+	if v, err := g.SetView("response", 1, 6, maxX/2-1, maxY-6); err != nil {
 		if err != gocui.ErrUnknownView {
 			return err
 		}
-		v.Title = "Response"
-		fmt.Fprintf(v, "Enter your response for question %d here:\n", questionNum)
+		v.Title = "Responses"
+		// fmt.Fprintf(v, "Enter your response for question %d here:\n", questionNum)
+		v.Editable = false
+		v.Wrap = true
+		v.Autoscroll = true
+	}
+	if v, err := g.SetView("textBox", 1, maxY-5, maxX/2-1, maxY-1); err != nil {
+		if err != gocui.ErrUnknownView {
+			return err
+		}
+		v.Title = "Type Here"
+		// fmt.Fprintf(v, "Enter your response for question %d here:\n", questionNum)
 		v.Editable = true
 		v.Wrap = true
 		v.Autoscroll = true
-		g.SetCurrentView("response")
+		g.SetCurrentView("textBox")
 	}
 	if v, err := g.SetView("timer", maxX/2, 6, maxX-1, maxY-1); err != nil {
 		if err != gocui.ErrUnknownView {
@@ -78,35 +102,31 @@ func layout(g *gocui.Gui) error {
 }
 
 func keybindings(g *gocui.Gui) error {
-	err := g.SetKeybinding("response", gocui.KeyEnter, gocui.ModNone, nextQuestion)
-	if err != nil {
+	if err := g.SetKeybinding("", 'q', gocui.ModNone, quit); err != nil {
+		return err
+	}
+	if err := g.SetKeybinding("textBox", gocui.KeyEnter, gocui.ModNone, nextQuestion); err != nil {
 		return err
 	}
 	return nil
 }
 
-func nextQuestion(g *gocui.Gui, keyEvt *gocui.KeyEvent) error {
-	// Record response time for previous question
-	if questionNum > 1 {
-		responseTime := time.Since(startTime).Seconds()
-		responseTimes[questionNum-2] = fmt.Sprintf("%.2f", responseTime)
-	}
+func quit(g *gocui.Gui, v *gocui.View) error {
+	return gocui.ErrQuit
+}
 
-	// Record response for current question
-	g.Update(func(g *gocui.Gui) error {
-		v, _ := g.View("response")
-		response := strings.TrimSpace(v.Buffer())
-		if response == "" {
-			response = "Not answered"
+func checkValidResponse(response string) error {
+	valid_responses := []string{"a", "b", "c", "d", "e"}
+	for _, validOpt := range valid_responses {
+		if response == validOpt {
+			return nil
 		}
-		responses[questionNum-1] = response
-		v.Clear()
-		return nil
-	})
+	}
+	return os.ErrInvalid
+}
 
-	// Move to next question or end test
-	questionNum++
-	if questionNum > numQuestions {
+func checkEOT(g *gocui.Gui, v *gocui.View) error {
+	if currIdx > stopIdx {
 		// End test
 		g.Update(func(g *gocui.Gui) error {
 			v, _ := g.View("question")
@@ -117,54 +137,116 @@ func nextQuestion(g *gocui.Gui, keyEvt *gocui.KeyEvent) error {
 		})
 
 		// Write response times and responses to CSV
-		headers := []string{"Question", "Response Time (s)", "Response"}
+		headers := []string{"Question", "Response Time (s)", "Cumulative Time (s)", "Response"}
 		data := make([][]string, numQuestions)
-		for i := 0; i < numQuestions; i++ {
-			data[i] = []string{fmt.Sprintf("%d", i+1), responseTimes[i], responses[i]}
+		cumulative_time := 0.0
+		for i := startIdx; i < stopIdx+1; i++ {
+			cumulative_time = cumulative_time + questionBank[i-startIdx].responseTime
+			data[i-startIdx] = []string{
+				fmt.Sprintf("%d", i),
+				fmt.Sprintf("%f", questionBank[i-startIdx].responseTime),
+				fmt.Sprintf("%f", cumulative_time),
+				questionBank[i-startIdx].response}
 		}
 		writeCSV("responses.csv", append([][]string{headers}, data...))
 
 		// Compare responses to answer key
-		if len(answers) > 0 {
-			numCorrect := 0
-			for i := 0; i < numQuestions; i++ {
-				if responses[i] == answers[i] {
-					numCorrect++
-				}
-			}
+		// if len(answers) > 0 {
+		// 	numCorrect := 0
+		// 	for i := 0; i < numQuestions; i++ {
+		// 		if responses[i] == answers[i] {
+		// 			numCorrect++
+		// 		}
+		// 	}
 
-			// Write score to CSV
-			score := float64(numCorrect) / float64(numQuestions) * 100
-			writeCSV("score.csv", [][]string{{fmt.Sprintf("%.2f%%", score)}})
-		} else {
+		// 	// Write score to CSV
+		// 	score := float64(numCorrect) / float64(numQuestions) * 100
+		// 	writeCSV("score.csv", [][]string{{fmt.Sprintf("%.2f%%", score)}})
+		// } else {
+		// 	g.Update(func(g *gocui.Gui) error {
+		// 		v, _ := g.View("question")
+		// 		v.Clear()
+		// 		v.Title = "Test complete"
+		// 		fmt.Fprintf(v, "You have completed the test.\n")
+		// 		return nil
+		// 	})
+		// }
+
+        return os.ErrProcessDone
+	}
+    return nil
+}
+
+func nextQuestion(g *gocui.Gui, v *gocui.View) error {
+
+	// Record response time for previous question
+	questionBank[currIdx-1].responseTime = time.Since(lastAnsTime).Seconds()
+
+	// Record response for current question
+	response := strings.TrimSpace(v.Buffer())
+	if response == "" {
+		response = "Not answered"
+	} else if err := checkValidResponse(response); err != nil {
+		if err == os.ErrInvalid {
 			g.Update(func(g *gocui.Gui) error {
-				v, _ := g.View("question")
-				v.Clear()
-				v.Title = "Test complete"
-				fmt.Fprintf(v, "You have completed the test.\n")
+				v, _ := g.View("response")
+				fmt.Fprintf(v, "\nInvalid Response")
 				return nil
 			})
-		}
-	} else {
-		// Next question
-		g.Update(func(g *gocui.Gui) error {
-			v, _ := g.View("question")
-			v.Title = fmt.Sprintf("Question %d", questionNum)
-			fmt.Fprintf(v, "This is question %d\n", questionNum)
+			v.Clear()
+			v.EditDelete(true)
 			return nil
-		})
+		}
 	}
+	responseView, _ := g.View("response")
+	fmt.Fprintf(responseView, "\nQuestion %d  Answer: %s  Resp Time: %0f", currIdx, response, questionBank[currIdx-1].responseTime)
+	questionBank[currIdx-1].response = response
+	v.Clear()
+	v.EditDelete(true)
+
+	// Move to next question or end test
+	currIdx++
+    if err := checkEOT(g, v); err != nil {
+        if err == os.ErrProcessDone {
+            return nil
+        }
+    }
+	g.Update(func(g *gocui.Gui) error {
+		v, _ := g.View("question")
+		v.Title = fmt.Sprintf("Question %d", currIdx)
+		fmt.Fprintf(v, "This is question %d\n", currIdx)
+		return nil
+	})
+	lastAnsTime = time.Now()
 	return nil
 }
 
-func setAnswerKey() {
-	// Manually set the answer key
-	for i := 0; i < numQuestions; i++ {
-		fmt.Printf("Enter the answer for question %d: ", i+1)
-		fmt.Scanf("%s", &answers[i])
-	}
-	writeCSV("answer_key.csv", answers)
-}
+// func setAnswerKey(g *gocui.Gui, v *gocui.View) error {
+// 	answerKey := strings.TrimSpace(v.Buffer())
+// 	if answerKey == "" {
+// 		return nil
+// 	}
+// 	answers = strings.Split(answerKey, "\n")
+// 	v.Clear()
+
+// 	// Write answer key to CSV
+// 	headers := []string{"Question", "Answer"}
+// 	data := make([][]string, numQuestions)
+// 	for i := 0; i < numQuestions; i++ {
+// 		data[i] = []string{fmt.Sprintf("%d", i+1), answers[i]}
+// 	}
+// 	writeCSV("answer_key.csv", append([][]string{headers}, data...))
+
+// 	g.Update(func(g *gocui.Gui) error {
+// 		v, _ := g.View("question")
+// 		v.Clear()
+// 		v.Title = "Answer key set"
+// 		fmt.Fprintf(v, "You have set the answer key.\n")
+// 		return nil
+// 	})
+
+// 	return nil
+// }
 
 func readCSV(filename string) [][]string {
 	// Read a CSV file into a 2D string array
