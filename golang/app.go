@@ -5,16 +5,10 @@ import (
 	"fmt"
 	"os"
 	//"strconv"
+	"flag"
+	"github.com/jroimartin/gocui"
 	"strings"
 	"time"
-
-	"github.com/jroimartin/gocui"
-)
-
-const (
-	startIdx     = 1
-	stopIdx      = 10
-	numQuestions = (stopIdx - startIdx + 1)
 )
 
 type questionData struct {
@@ -25,10 +19,15 @@ type questionData struct {
 }
 
 var (
-	startTime    time.Time
-	lastAnsTime  time.Time
-	currIdx      int
-	questionBank = make([]questionData, (stopIdx - startIdx + 1))
+	startIdx       int
+	stopIdx        int
+	numQuestions   int
+	testDuration_m int
+	testDuration_s int
+	startTime      time.Time
+	lastAnsTime    time.Time
+	currIdx        int
+	questionBank   = make([]questionData, 1)
 )
 
 func main() {
@@ -39,6 +38,7 @@ func main() {
 	}
 	defer g.Close()
 
+	setupCmdlineArgs()
 	// Set the view dimensions
 	g.SetManagerFunc(layout)
 
@@ -56,7 +56,22 @@ func main() {
 	startTime = time.Now()
 	lastAnsTime = startTime
 	currIdx = startIdx
+	go runTimer(g)
 	g.MainLoop()
+}
+
+func setupCmdlineArgs() {
+	startIdx_ptr := flag.Int("startIdx", 1, "help message for flagname")
+	stopIdx_ptr := flag.Int("stopIdx", 10, "help message for flagname")
+	testDuration_m_ptr := flag.Int("dur", 10, "help message for flagname")
+	flag.Parse()
+	startIdx = *startIdx_ptr
+	stopIdx = *stopIdx_ptr
+	testDuration_m = *testDuration_m_ptr
+	numQuestions = stopIdx - startIdx + 1
+	questionBank = make([]questionData, (stopIdx - startIdx + 1))
+	testDuration_s = testDuration_m * 60
+	fmt.Printf("Parsed args")
 }
 
 func layout(g *gocui.Gui) error {
@@ -66,8 +81,8 @@ func layout(g *gocui.Gui) error {
 			return err
 		}
 		v.Title = fmt.Sprintf("Question %d", startIdx)
-        v.Wrap = true
-        v.Autoscroll = true
+		v.Wrap = true
+		v.Autoscroll = true
 		fmt.Fprintln(v, "This is question", startIdx)
 	}
 	if v, err := g.SetView("response", 1, 6, maxX/2-1, maxY-6); err != nil {
@@ -96,7 +111,7 @@ func layout(g *gocui.Gui) error {
 			return err
 		}
 		v.Title = "Timer"
-		fmt.Fprintf(v, "Time elapsed: %v", time.Since(startTime).Round(time.Second))
+		// fmt.Fprintf(v, "Time elapsed: %v", time.Since(startTime).Round(time.Second))
 	}
 	return nil
 }
@@ -109,6 +124,25 @@ func keybindings(g *gocui.Gui) error {
 		return err
 	}
 	return nil
+}
+
+func runTimer(g *gocui.Gui) {
+	timerChan := time.NewTicker(time.Second).C
+	for {
+		select {
+		case <-timerChan:
+			g.Update(func(g *gocui.Gui) error {
+				v, err := g.View("timer")
+				if err != nil {
+					return err
+				}
+				v.Clear()
+				fmt.Fprintf(v, "Time spent on this question: %ds\n", int(time.Since(lastAnsTime).Seconds()))
+				fmt.Fprintf(v, "Total Time remaining: %ds\n", (testDuration_s - int(time.Since(startTime).Seconds())))
+				return nil
+			})
+		}
+	}
 }
 
 func quit(g *gocui.Gui, v *gocui.View) error {
@@ -132,7 +166,7 @@ func checkEOT(g *gocui.Gui, v *gocui.View) error {
 			v, _ := g.View("question")
 			v.Clear()
 			v.Title = "Test complete"
-			fmt.Fprintf(v, "You have completed the test.\n")
+			fmt.Fprintf(v, "\nYou have completed the test.\n")
 			return nil
 		})
 
@@ -172,15 +206,20 @@ func checkEOT(g *gocui.Gui, v *gocui.View) error {
 		// 	})
 		// }
 
-        return os.ErrProcessDone
+		return os.ErrProcessDone
 	}
-    return nil
+	return nil
 }
 
 func nextQuestion(g *gocui.Gui, v *gocui.View) error {
 
+	if err := checkEOT(g, v); err != nil {
+		if err == os.ErrProcessDone {
+			return nil
+		}
+	}
 	// Record response time for previous question
-	questionBank[currIdx-1].responseTime = time.Since(lastAnsTime).Seconds()
+	questionBank[currIdx-startIdx].responseTime = time.Since(lastAnsTime).Seconds()
 
 	// Record response for current question
 	response := strings.TrimSpace(v.Buffer())
@@ -199,25 +238,25 @@ func nextQuestion(g *gocui.Gui, v *gocui.View) error {
 		}
 	}
 	responseView, _ := g.View("response")
-	fmt.Fprintf(responseView, "\nQuestion %d  Answer: %s  Resp Time: %0f", currIdx, response, questionBank[currIdx-1].responseTime)
-	questionBank[currIdx-1].response = response
+	fmt.Fprintf(responseView, "\nQuestion %d  Answer: %s  Resp Time: %0f", currIdx, response, questionBank[currIdx-startIdx].responseTime)
+	questionBank[currIdx-startIdx].response = response
 	v.Clear()
 	v.EditDelete(true)
 
+	lastAnsTime = time.Now()
 	// Move to next question or end test
 	currIdx++
-    if err := checkEOT(g, v); err != nil {
-        if err == os.ErrProcessDone {
-            return nil
-        }
-    }
+	if err := checkEOT(g, v); err != nil {
+		if err == os.ErrProcessDone {
+			return nil
+		}
+	}
 	g.Update(func(g *gocui.Gui) error {
 		v, _ := g.View("question")
 		v.Title = fmt.Sprintf("Question %d", currIdx)
 		fmt.Fprintf(v, "This is question %d\n", currIdx)
 		return nil
 	})
-	lastAnsTime = time.Now()
 	return nil
 }
 

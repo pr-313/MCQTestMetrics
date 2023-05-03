@@ -1,4 +1,4 @@
-module test3
+module MCQTest
 
 go 1.20
 
