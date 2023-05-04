@@ -4,10 +4,13 @@ import (
 	"encoding/csv"
 	"fmt"
 	"os"
-	"github.com/jroimartin/gocui"
-	"github.com/integrii/flaggy"
+	"strconv"
 	"strings"
 	"time"
+
+	"github.com/integrii/flaggy"
+	"github.com/jroimartin/gocui"
+    "github.com/olekukonko/tablewriter"
 )
 
 type questionData struct {
@@ -15,6 +18,7 @@ type questionData struct {
 	answer       string
 	response     string
 	responseTime float64
+	correct      string
 }
 
 var (
@@ -27,10 +31,17 @@ var (
 	lastAnsTime    time.Time
 	currIdx        int
 	questionBank   = make([]questionData, 1)
+	key_mode       bool
+	checkResponses bool
 )
 
 func main() {
 	setupCmdlineArgs()
+
+	if checkResponses {
+		evalResponses()
+		os.Exit(0)
+	}
 	// Initialize gocui
 	g, err := gocui.NewGui(gocui.Output256)
 	if err != nil {
@@ -56,13 +67,15 @@ func main() {
 }
 
 func setupCmdlineArgs() {
-    startIdx = 1
-    stopIdx = 10
-    testDuration_m = 10
+	startIdx = 1
+	stopIdx = 10
+	testDuration_m = 10
 	flaggy.DefaultParser.ShowVersionWithVersionFlag = false
-    flaggy.Int(&startIdx, "s", "startIdx", "Start from Question Index")
-    flaggy.Int(&stopIdx, "e", "stopIdx", "Stop at Question Index")
-    flaggy.Int(&testDuration_m, "t", "dur", "Duration of test")
+	flaggy.Int(&startIdx, "s", "startIdx", "Start from Question Index")
+	flaggy.Int(&stopIdx, "e", "stopIdx", "Stop at Question Index")
+	flaggy.Int(&testDuration_m, "t", "dur", "Duration of test")
+	flaggy.Bool(&key_mode, "k", "key", "Answer Key mode")
+	flaggy.Bool(&checkResponses, "c", "check", "Check Responses Against Answer Key")
 	flaggy.Parse()
 	numQuestions = stopIdx - startIdx + 1
 	questionBank = make([]questionData, (stopIdx - startIdx + 1))
@@ -132,8 +145,12 @@ func runTimer(g *gocui.Gui) {
 					return err
 				}
 				v.Clear()
-				fmt.Fprintf(v, "Time spent on this question: %ds\n", int(time.Since(lastAnsTime).Seconds()))
-				fmt.Fprintf(v, "Total Time remaining: %ds\n", (testDuration_s - int(time.Since(startTime).Seconds())))
+				if key_mode {
+					fmt.Fprintf(v, "Answer Key Mode")
+				} else {
+					fmt.Fprintf(v, "Time spent on this question: %ds\n", int(time.Since(lastAnsTime).Seconds()))
+					fmt.Fprintf(v, "Total Time remaining: %ds\n", (testDuration_s - int(time.Since(startTime).Seconds())))
+				}
 				return nil
 			})
 		}
@@ -164,23 +181,33 @@ func checkEOT(g *gocui.Gui, v *gocui.View) error {
 			fmt.Fprintf(v, "\nYou have completed the test.\n")
 			return nil
 		})
-
+		pushQuestionBankToCsv(questionBank)
 		// Write response times and responses to CSV
-		headers := []string{"Question", "Response Time (s)", "Cumulative Time (s)", "Response"}
-		data := make([][]string, numQuestions)
-		cumulative_time := 0.0
-		for i := startIdx; i < stopIdx+1; i++ {
-			cumulative_time = cumulative_time + questionBank[i-startIdx].responseTime
-			data[i-startIdx] = []string{
-				fmt.Sprintf("%d", i),
-				fmt.Sprintf("%f", questionBank[i-startIdx].responseTime),
-				fmt.Sprintf("%f", cumulative_time),
-				questionBank[i-startIdx].response}
-		}
-		writeCSV("responses.csv", append([][]string{headers}, data...))
 		return os.ErrProcessDone
 	}
 	return nil
+}
+
+func pushQuestionBankToCsv(qData []questionData) [][]string {
+	headers := []string{"Question", "Response Time (s)", "Cumulative Time (s)", "Response", "Correct Answer", "Result"}
+	data := make([][]string, numQuestions)
+	cumulative_time := 0.0
+	for i, q := range qData {
+		cumulative_time = cumulative_time + q.responseTime
+		data[i] = []string{
+			fmt.Sprintf("%d", i+startIdx),
+			fmt.Sprintf("%f", q.responseTime),
+			fmt.Sprintf("%f", cumulative_time),
+			q.response,
+			q.answer,
+			q.correct}
+	}
+	if key_mode {
+		writeCSV("key.csv", append([][]string{headers}, data...))
+	} else {
+		writeCSV("responses.csv", append([][]string{headers}, data...))
+	}
+	return append([][]string{headers}, data...)
 }
 
 func nextQuestion(g *gocui.Gui, v *gocui.View) error {
@@ -232,6 +259,35 @@ func nextQuestion(g *gocui.Gui, v *gocui.View) error {
 	return nil
 }
 
+func evalResponses() {
+	// var eval = make([]questionData, numQuestions)
+	responses := csvToQuestionData(readCSV("responses.csv"))
+	key := csvToQuestionData(readCSV("key.csv"))
+
+	for i, question := range responses {
+		if question.response == key[i].response {
+			responses[i].correct = "Correct"
+		} else {
+			responses[i].correct = "Wrong"
+		}
+		responses[i].answer = key[i].response
+	}
+    printCSV(pushQuestionBankToCsv(responses)[1:])
+
+}
+
+func csvToQuestionData(responses_raw [][]string) []questionData {
+	var responses = make([]questionData, numQuestions)
+	for i, validOpt := range responses_raw {
+		responses[i].questionNum, _ = strconv.Atoi(validOpt[0])
+		responses[i].responseTime, _ = strconv.ParseFloat(validOpt[1], 32)
+		responses[i].response = validOpt[3]
+		responses[i].answer = validOpt[4]
+		responses[i].correct = validOpt[5]
+	}
+	return responses
+}
+
 func readCSV(filename string) [][]string {
 	// Read a CSV file into a 2D string array
 	file, err := os.Open(filename)
@@ -246,7 +302,7 @@ func readCSV(filename string) [][]string {
 		panic(err)
 	}
 
-	return records
+	return records[1:]
 }
 
 func writeCSV(filename string, data [][]string) {
@@ -262,4 +318,14 @@ func writeCSV(filename string, data [][]string) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func printCSV(data [][]string) {
+	table := tablewriter.NewWriter(os.Stdout)
+	table.SetHeader([]string{"Question", "Response Time (s)", "Cumulative Time (s)", "Response", "Correct Answer", "Result"})
+
+	for _, v := range data {
+		table.Append(v)
+	}
+	table.Render()
 }
