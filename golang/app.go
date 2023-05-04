@@ -4,8 +4,6 @@ import (
 	"encoding/csv"
 	"fmt"
 	"os"
-	//"strconv"
-	// "flag"
 	"github.com/jroimartin/gocui"
 	"github.com/integrii/flaggy"
 	"strings"
@@ -58,6 +56,9 @@ func main() {
 }
 
 func setupCmdlineArgs() {
+    startIdx = 1
+    stopIdx = 10
+    testDuration_m = 10
 	flaggy.DefaultParser.ShowVersionWithVersionFlag = false
     flaggy.Int(&startIdx, "s", "startIdx", "Start from Question Index")
     flaggy.Int(&stopIdx, "e", "stopIdx", "Stop at Question Index")
@@ -177,29 +178,6 @@ func checkEOT(g *gocui.Gui, v *gocui.View) error {
 				questionBank[i-startIdx].response}
 		}
 		writeCSV("responses.csv", append([][]string{headers}, data...))
-
-		// Compare responses to answer key
-		// if len(answers) > 0 {
-		// 	numCorrect := 0
-		// 	for i := 0; i < numQuestions; i++ {
-		// 		if responses[i] == answers[i] {
-		// 			numCorrect++
-		// 		}
-		// 	}
-
-		// 	// Write score to CSV
-		// 	score := float64(numCorrect) / float64(numQuestions) * 100
-		// 	writeCSV("score.csv", [][]string{{fmt.Sprintf("%.2f%%", score)}})
-		// } else {
-		// 	g.Update(func(g *gocui.Gui) error {
-		// 		v, _ := g.View("question")
-		// 		v.Clear()
-		// 		v.Title = "Test complete"
-		// 		fmt.Fprintf(v, "You have completed the test.\n")
-		// 		return nil
-		// 	})
-		// }
-
 		return os.ErrProcessDone
 	}
 	return nil
@@ -253,33 +231,6 @@ func nextQuestion(g *gocui.Gui, v *gocui.View) error {
 	})
 	return nil
 }
-
-// func setAnswerKey(g *gocui.Gui, v *gocui.View) error {
-// 	answerKey := strings.TrimSpace(v.Buffer())
-// 	if answerKey == "" {
-// 		return nil
-// 	}
-// 	answers = strings.Split(answerKey, "\n")
-// 	v.Clear()
-
-// 	// Write answer key to CSV
-// 	headers := []string{"Question", "Answer"}
-// 	data := make([][]string, numQuestions)
-// 	for i := 0; i < numQuestions; i++ {
-// 		data[i] = []string{fmt.Sprintf("%d", i+1), answers[i]}
-// 	}
-// 	writeCSV("answer_key.csv", append([][]string{headers}, data...))
-
-// 	g.Update(func(g *gocui.Gui) error {
-// 		v, _ := g.View("question")
-// 		v.Clear()
-// 		v.Title = "Answer key set"
-// 		fmt.Fprintf(v, "You have set the answer key.\n")
-// 		return nil
-// 	})
-
-// 	return nil
-// }
 
 func readCSV(filename string) [][]string {
 	// Read a CSV file into a 2D string array
