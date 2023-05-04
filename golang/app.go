@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"os"
 	//"strconv"
-	"flag"
+	// "flag"
 	"github.com/jroimartin/gocui"
+	"github.com/integrii/flaggy"
 	"strings"
 	"time"
 )
@@ -31,6 +32,7 @@ var (
 )
 
 func main() {
+	setupCmdlineArgs()
 	// Initialize gocui
 	g, err := gocui.NewGui(gocui.Output256)
 	if err != nil {
@@ -38,7 +40,6 @@ func main() {
 	}
 	defer g.Close()
 
-	setupCmdlineArgs()
 	// Set the view dimensions
 	g.SetManagerFunc(layout)
 
@@ -47,10 +48,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-
-	// Set the answer key (if available)
-	// Uncomment the following line to manually set the answer key
-	// setAnswerKey()
 
 	// Start the test
 	startTime = time.Now()
@@ -61,17 +58,14 @@ func main() {
 }
 
 func setupCmdlineArgs() {
-	startIdx_ptr := flag.Int("startIdx", 1, "help message for flagname")
-	stopIdx_ptr := flag.Int("stopIdx", 10, "help message for flagname")
-	testDuration_m_ptr := flag.Int("dur", 10, "help message for flagname")
-	flag.Parse()
-	startIdx = *startIdx_ptr
-	stopIdx = *stopIdx_ptr
-	testDuration_m = *testDuration_m_ptr
+	flaggy.DefaultParser.ShowVersionWithVersionFlag = false
+    flaggy.Int(&startIdx, "s", "startIdx", "Start from Question Index")
+    flaggy.Int(&stopIdx, "e", "stopIdx", "Stop at Question Index")
+    flaggy.Int(&testDuration_m, "t", "dur", "Duration of test")
+	flaggy.Parse()
 	numQuestions = stopIdx - startIdx + 1
 	questionBank = make([]questionData, (stopIdx - startIdx + 1))
 	testDuration_s = testDuration_m * 60
-	fmt.Printf("Parsed args")
 }
 
 func layout(g *gocui.Gui) error {
