@@ -10,7 +10,7 @@ import (
 
 	"github.com/integrii/flaggy"
 	"github.com/jroimartin/gocui"
-    "github.com/olekukonko/tablewriter"
+	"github.com/olekukonko/tablewriter"
 )
 
 type questionData struct {
@@ -214,6 +214,11 @@ func nextQuestion(g *gocui.Gui, v *gocui.View) error {
 
 	if err := checkEOT(g, v); err != nil {
 		if err == os.ErrProcessDone {
+			g.Update(func(g *gocui.Gui) error {
+				v, _ := g.View("response")
+                fmt.Fprintf(v, "\nTest Complete: Press q to exit")
+				return nil
+			})
 			return nil
 		}
 	}
@@ -223,7 +228,18 @@ func nextQuestion(g *gocui.Gui, v *gocui.View) error {
 	// Record response for current question
 	response := strings.TrimSpace(v.Buffer())
 	if response == "" {
-		response = "Not answered"
+		if key_mode {
+			g.Update(func(g *gocui.Gui) error {
+				v, _ := g.View("response")
+				fmt.Fprintf(v, "\nAnswer Key answer cannot be blank")
+				return nil
+			})
+			v.Clear()
+			v.EditDelete(true)
+			return nil
+		} else {
+			response = "Not answered"
+		}
 	} else if err := checkValidResponse(response); err != nil {
 		if err == os.ErrInvalid {
 			g.Update(func(g *gocui.Gui) error {
@@ -272,7 +288,7 @@ func evalResponses() {
 		}
 		responses[i].answer = key[i].response
 	}
-    printCSV(pushQuestionBankToCsv(responses)[1:])
+	printCSV(pushQuestionBankToCsv(responses)[1:])
 
 }
 
