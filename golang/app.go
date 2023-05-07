@@ -181,33 +181,15 @@ func checkEOT(g *gocui.Gui, v *gocui.View) error {
 			fmt.Fprintf(v, "\nYou have completed the test.\n")
 			return nil
 		})
-		pushQuestionBankToCsv(questionBank)
+		if key_mode {
+			pushQuestionBankToCsv(questionBank, "key.csv")
+		} else {
+			pushQuestionBankToCsv(questionBank, "responses.csv")
+		}
 		// Write response times and responses to CSV
 		return os.ErrProcessDone
 	}
 	return nil
-}
-
-func pushQuestionBankToCsv(qData []questionData) [][]string {
-	headers := []string{"Question", "Response Time (s)", "Cumulative Time (s)", "Response", "Correct Answer", "Result"}
-	data := make([][]string, numQuestions)
-	cumulative_time := 0.0
-	for i, q := range qData {
-		cumulative_time = cumulative_time + q.responseTime
-		data[i] = []string{
-			fmt.Sprintf("%d", i+startIdx),
-			fmt.Sprintf("%f", q.responseTime),
-			fmt.Sprintf("%f", cumulative_time),
-			q.response,
-			q.answer,
-			q.correct}
-	}
-	if key_mode {
-		writeCSV("key.csv", append([][]string{headers}, data...))
-	} else {
-		writeCSV("responses.csv", append([][]string{headers}, data...))
-	}
-	return append([][]string{headers}, data...)
 }
 
 func nextQuestion(g *gocui.Gui, v *gocui.View) error {
@@ -216,7 +198,7 @@ func nextQuestion(g *gocui.Gui, v *gocui.View) error {
 		if err == os.ErrProcessDone {
 			g.Update(func(g *gocui.Gui) error {
 				v, _ := g.View("response")
-                fmt.Fprintf(v, "\nTest Complete: Press q to exit")
+				fmt.Fprintf(v, "\nTest Complete: Press q to exit")
 				return nil
 			})
 			return nil
@@ -281,25 +263,53 @@ func evalResponses() {
 	key := csvToQuestionData(readCSV("key.csv"))
 
 	for i, question := range responses {
-		if question.response == key[i].response {
-			responses[i].correct = "Correct"
-		} else {
-			responses[i].correct = "Wrong"
+	keyIdxSearch:
+		for _, ans := range key {
+			if question.questionNum == ans.questionNum {
+				if question.response == ans.response {
+					responses[i].correct = "Correct"
+				} else {
+					responses[i].correct = "Wrong"
+				}
+				responses[i].answer = ans.response
+				break keyIdxSearch
+			}
 		}
-		responses[i].answer = key[i].response
 	}
-	printCSV(pushQuestionBankToCsv(responses)[1:])
+	printCSV(pushQuestionBankToCsv(responses, "results.csv")[1:])
+}
 
+func pushQuestionBankToCsv(qData []questionData, filename string) [][]string {
+	headers := []string{"Question", "Response Time (s)", "Cumulative Time (s)", "Response", "Correct Answer", "Result"}
+	data := make([][]string, len(qData))
+	cumulative_time := 0.0
+	for i, q := range qData {
+		cumulative_time = cumulative_time + q.responseTime
+		data[i] = []string{
+			fmt.Sprintf("%d", q.questionNum),
+			fmt.Sprintf("%f", q.responseTime),
+			fmt.Sprintf("%f", cumulative_time),
+			q.response,
+			q.answer,
+			q.correct}
+	}
+	writeCSV(filename, append([][]string{headers}, data...))
+	return append([][]string{headers}, data...)
 }
 
 func csvToQuestionData(responses_raw [][]string) []questionData {
-	var responses = make([]questionData, numQuestions)
-	for i, validOpt := range responses_raw {
-		responses[i].questionNum, _ = strconv.Atoi(validOpt[0])
-		responses[i].responseTime, _ = strconv.ParseFloat(validOpt[1], 32)
-		responses[i].response = validOpt[3]
-		responses[i].answer = validOpt[4]
-		responses[i].correct = validOpt[5]
+	var responses = make([]questionData, 0)
+	for _, validOpt := range responses_raw {
+		var localQ questionData
+		idx, _ := strconv.Atoi(validOpt[0])
+		if idx >= startIdx && idx <= stopIdx {
+			localQ.questionNum = idx
+			localQ.responseTime, _ = strconv.ParseFloat(validOpt[1], 32)
+			localQ.response = validOpt[3]
+			localQ.answer = validOpt[4]
+			localQ.correct = validOpt[5]
+            responses = append(responses, localQ)
+		}
 	}
 	return responses
 }
