@@ -237,6 +237,7 @@ func nextQuestion(g *gocui.Gui, v *gocui.View) error {
 	responseView, _ := g.View("response")
 	fmt.Fprintf(responseView, "\nQuestion %d  Answer: %s  Resp Time: %0f", currIdx, response, questionBank[currIdx-startIdx].responseTime)
 	questionBank[currIdx-startIdx].response = response
+	questionBank[currIdx-startIdx].questionNum = currIdx
 	v.Clear()
 	v.EditDelete(true)
 
