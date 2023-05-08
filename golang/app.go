@@ -149,7 +149,9 @@ func runTimer(g *gocui.Gui) {
 					fmt.Fprintf(v, "Answer Key Mode")
 				} else {
 					fmt.Fprintf(v, "Time spent on this question: %ds\n", int(time.Since(lastAnsTime).Seconds()))
-					fmt.Fprintf(v, "Total Time remaining: %ds\n", (testDuration_s - int(time.Since(startTime).Seconds())))
+					fmt.Fprintf(v, "Total Time remaining: %dm %ds\n",
+						(testDuration_m - int(time.Since(startTime).Minutes())),
+						(testDuration_s - int(time.Since(startTime).Seconds()))%60)
 				}
 				return nil
 			})
@@ -309,7 +311,7 @@ func csvToQuestionData(responses_raw [][]string) []questionData {
 			localQ.response = validOpt[3]
 			localQ.answer = validOpt[4]
 			localQ.correct = validOpt[5]
-            responses = append(responses, localQ)
+			responses = append(responses, localQ)
 		}
 	}
 	return responses
