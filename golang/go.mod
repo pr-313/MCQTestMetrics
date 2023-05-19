@@ -1,4 +1,4 @@
-module MCQTest
+module github.com/pr-313/MCQTestMetrics
 
 go 1.20
 

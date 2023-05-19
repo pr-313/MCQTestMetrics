@@ -11,6 +11,7 @@ import (
 	"github.com/integrii/flaggy"
 	"github.com/jroimartin/gocui"
 	"github.com/olekukonko/tablewriter"
+	"github.com/pr-313/MCQTestMetrics/src"
 )
 
 type questionData struct {
@@ -37,6 +38,7 @@ var (
 
 func main() {
 	setupCmdlineArgs()
+	src.HelloSrc()
 
 	if checkResponses {
 		evalResponses()
@@ -151,7 +153,7 @@ func runTimer(g *gocui.Gui) {
 					fmt.Fprintf(v, "Time spent on this question: %ds\n", int(time.Since(lastAnsTime).Seconds()))
 					fmt.Fprintf(v, "Total Time remaining: %dm %ds\n",
 						(testDuration_m - int(time.Since(startTime).Minutes())),
-						(testDuration_s - int(time.Since(startTime).Seconds()))%60)
+						(testDuration_s-int(time.Since(startTime).Seconds()))%60)
 				}
 				return nil
 			})
