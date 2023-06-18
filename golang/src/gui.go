@@ -28,6 +28,7 @@ func quit(g *gocui.Gui, v *gocui.View) error {
 }
 
 func checkEOT(g *gocui.Gui, v *gocui.View) error {
+    file_prefix := fmt.Sprintf("Q_Start_%d_End_%d", Args.StartIdx, Args.StopIdx) 
 	if CurrIdx > Args.StopIdx {
 		// End test
 		g.Update(func(g *gocui.Gui) error {
@@ -38,9 +39,9 @@ func checkEOT(g *gocui.Gui, v *gocui.View) error {
 			return nil
 		})
 		if Args.Key_mode {
-			utils.PushQuestionBankToCsv(QuestionBank, "key.csv")
+			utils.PushQuestionBankToCsv(QuestionBank, fmt.Sprintf("%s_key.csv", file_prefix))
 		} else {
-			utils.PushQuestionBankToCsv(QuestionBank, "responses.csv")
+			utils.PushQuestionBankToCsv(QuestionBank, fmt.Sprintf("%s_responses.csv", file_prefix))
 		}
 		// Write response times and responses to CSV
 		return os.ErrProcessDone

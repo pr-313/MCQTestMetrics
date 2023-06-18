@@ -2,6 +2,7 @@ package utils
 
 import (
 	"encoding/csv"
+	"fmt"
 	// "fmt"
 	"os"
 
@@ -10,8 +11,9 @@ import (
 
 func EvalResponses(args CmdlineArgs) {
 	// var eval = make([]questionData, numQuestions)
-	responses := CsvToQuestionData(ReadCSV("responses.csv"), args)
-	key := CsvToQuestionData(ReadCSV("key.csv"), args)
+    file_prefix := fmt.Sprintf("Q_Start_%d_End_%d", args.StartIdx, args.StopIdx) 
+	responses := CsvToQuestionData(ReadCSV(fmt.Sprintf("%s_responses.csv", file_prefix)), args)
+	key := CsvToQuestionData(ReadCSV(fmt.Sprintf("%s_key.csv", file_prefix)), args)
 
 	for i, question := range responses {
 	keyIdxSearch:
@@ -27,7 +29,7 @@ func EvalResponses(args CmdlineArgs) {
 			}
 		}
 	}
-	PrintCSV(PushQuestionBankToCsv(responses, "results.csv")[1:])
+	PrintCSV(PushQuestionBankToCsv(responses, fmt.Sprintf("%s_results.csv", file_prefix))[1:])
 }
 
 func ReadCSV(filename string) [][]string {
