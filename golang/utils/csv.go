@@ -11,7 +11,7 @@ import (
 
 func EvalResponses(args CmdlineArgs) {
 	// var eval = make([]questionData, numQuestions)
-    file_prefix := fmt.Sprintf("Q_Start_%d_End_%d", args.StartIdx, args.StopIdx) 
+	file_prefix := fmt.Sprintf("Q_Start_%d_End_%d", args.StartIdx, args.StopIdx)
 	responses := CsvToQuestionData(ReadCSV(fmt.Sprintf("%s_responses.csv", file_prefix)), args)
 	key := CsvToQuestionData(ReadCSV(fmt.Sprintf("%s_key.csv", file_prefix)), args)
 

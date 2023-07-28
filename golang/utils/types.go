@@ -1,7 +1,6 @@
 package utils
 
-import (
-)
+import ()
 
 type QuestionData struct {
 	QuestionNum  int

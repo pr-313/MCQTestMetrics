@@ -1,10 +1,10 @@
 package utils
 
 import (
-    "fmt"
+	"fmt"
 	"github.com/integrii/flaggy"
-    "strconv"
-    "os"
+	"os"
+	"strconv"
 )
 
 func (args *CmdlineArgs) SetupCmdlineArgs() []QuestionData {
@@ -17,8 +17,8 @@ func (args *CmdlineArgs) SetupCmdlineArgs() []QuestionData {
 	flaggy.Parse()
 	args.NumQuestions = args.StopIdx - args.StartIdx + 1
 	args.TestDuration_s = args.TestDuration_m * 60
-    questionBank := make([]QuestionData, (args.StopIdx - args.StartIdx + 1))
-    return questionBank
+	questionBank := make([]QuestionData, (args.StopIdx - args.StartIdx + 1))
+	return questionBank
 }
 
 func PushQuestionBankToCsv(qData []QuestionData, filename string) [][]string {

@@ -28,7 +28,7 @@ func quit(g *gocui.Gui, v *gocui.View) error {
 }
 
 func checkEOT(g *gocui.Gui, v *gocui.View) error {
-    file_prefix := fmt.Sprintf("Q_Start_%d_End_%d", Args.StartIdx, Args.StopIdx) 
+	file_prefix := fmt.Sprintf("Q_Start_%d_End_%d", Args.StartIdx, Args.StopIdx)
 	if CurrIdx > Args.StopIdx {
 		// End test
 		g.Update(func(g *gocui.Gui) error {

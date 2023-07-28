@@ -4,12 +4,12 @@ import (
 	"os"
 
 	"github.com/jroimartin/gocui"
-	"github.com/pr-313/MCQTestMetrics/utils"
 	"github.com/pr-313/MCQTestMetrics/src"
+	"github.com/pr-313/MCQTestMetrics/utils"
 )
 
 func main() {
-    src.SetupGlobalVars()
+	src.SetupGlobalVars()
 
 	if src.Args.CheckResponses {
 		utils.EvalResponses(src.Args)
@@ -31,10 +31,7 @@ func main() {
 		panic(err)
 	}
 
-    go src.RunTimer(g)
+	go src.RunTimer(g)
 	// Start the test
 	g.MainLoop()
 }
-
-
-
